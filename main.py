@@ -1,8 +1,11 @@
 ﻿from os import environ
 from asyncio import run
+from json import loads
 
 from redis.asyncio import Redis
 from requests import Session, get
+
+from domain.pd.Manifest import Manifest
 
 API_KEY = environ['D2_API_KEY']
 store = Redis(db=1, decode_responses=True)
@@ -23,7 +26,7 @@ async def get_manifest(url: str, api_key: str, cache_key: str) -> str:
 
 async def main():
     manifest_string = await get_manifest('https://www.bungie.net/Platform/Destiny2/Manifest', API_KEY, 'manifest')
-    print(type(manifest_string))
+    manifest = Manifest.model_validate(loads(manifest_string))
 
 if __name__ == '__main__':
     run(main())
