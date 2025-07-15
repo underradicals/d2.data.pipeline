@@ -1,16 +1,13 @@
 ﻿from os import environ
 from asyncio import run, gather
 from json import loads
-
-import httpx
-from httpx import AsyncClient, stream
-
-from orjson import loads as orjson_loads, OPT_INDENT_2
+from httpx import AsyncClient
+from orjson import loads as orjson_loads
 from redis.asyncio import Redis
-from requests import Session, get
+from requests import get
+import logging
 
 from domain.pd.Manifest import Manifest
-import logging
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,7 +32,7 @@ async def get_manifest(url: str, api_key: str, cache_key: str) -> str:
 
 
 
-async def download_file_async(client: httpx.AsyncClient, url: str, api_key: str, cache_key: str):
+async def download_file_async(client: AsyncClient, url: str, api_key: str, cache_key: str):
     _cache_key = f'{cache_key}:jwccp'
     _last_modified_cache_key = f'{cache_key}:last_modified'
     last_modified_cache_value: str = await store.get(_last_modified_cache_key)
@@ -57,6 +54,7 @@ async def download_file_async(client: httpx.AsyncClient, url: str, api_key: str,
         headers = {'x-api-key': api_key, 'If-None-Match': last_modified_cache_value}
         response = await client.get(url, follow_redirects=True, headers=headers)
         response.raise_for_status()
+        logging.info(response.status_code)
 
         if response.status_code != 304:
             logging.info('Last Modified Expired: Refilling Cache')
