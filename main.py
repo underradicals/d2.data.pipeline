@@ -1,100 +1,78 @@
-﻿from os import environ
-from asyncio import run, gather
-from json import loads
-from httpx import AsyncClient
-from orjson import loads as orjson_loads
-from redis.asyncio import Redis
-from requests import get
+﻿import csv
+import json
 import logging
+import orjson
+from psycopg_pool import ConnectionPool
+from redis import Redis
+from pathlib import Path
 
-from domain.pd.Manifest import Manifest
+ROOT = Path(__file__).parent
 
 logging.basicConfig(level=logging.INFO)
+r = Redis(db=1, decode_responses=True)
 
-API_KEY = environ['D2_API_KEY']
-store = Redis(db=1, decode_responses=True)
+_keys_list = r.keys("Destiny*:jwccp")
+keys_list = [x.split(":")[0] for x in _keys_list]
 
-async def get_manifest(url: str, api_key: str, cache_key: str) -> str:
-    _cache_key = f'{cache_key}:value'
-    cache_key_value: str | bytes | None = await store.get(_cache_key)
-
-    if cache_key_value is None:
-        print('Cache key not found')
-        with get(url, stream=True, allow_redirects=True, headers={'x-api-key': api_key}) as response:
-            response.raise_for_status()
-            max_age = response.headers.get('Cache-Control').split('=')[-1]
-            content = response.content
-            await store.set(_cache_key, content, ex=int(max_age))
-            return content.decode('utf-8')
-
-    logging.info("Returning Cache Value")
-    return cache_key_value
+drop_table_names = '\n'.join([f"drop table if exists {x.split(":")[0]};" for x in _keys_list])
+create_table_names = '\n'.join([f"create table if not exists {x.split(":")[0]} (id bigint primary key,json jsonb);" for
+                              x in
+                              _keys_list])
 
 
+def create_tables_sql():
+    with open(f'{ROOT}\\sql\\tables.sql', 'w', encoding='utf-8') as f:
+        f.write(create_table_names)
 
-async def download_file_async(client: AsyncClient, url: str, api_key: str, cache_key: str):
-    _cache_key = f'{cache_key}:jwccp'
-    _last_modified_cache_key = f'{cache_key}:last_modified'
-    last_modified_cache_value: str = await store.get(_last_modified_cache_key)
-    cache_key_value: str | bytes | None = await store.get(_cache_key)
-
-    if last_modified_cache_value is None:
-        logging.info('First Time: Lets make a good impression')
-        response = await client.get(url, follow_redirects=True, headers={'x-api-key': api_key})
-        response.raise_for_status()
-        last_modified = response.headers.get('Last-Modified')
-        max_age = response.headers.get('Cache-Control').split('=')[-1]
-        content = response.content
-        await store.set(_cache_key, content, ex=int(max_age))
-        await store.set(_last_modified_cache_key, last_modified)
-        return None
-
-    if cache_key_value is None:
-        logging.info('Max Age Expired: Falling back to last modified')
-        headers = {'x-api-key': api_key, 'If-None-Match': last_modified_cache_value}
-        response = await client.get(url, follow_redirects=True, headers=headers)
-        response.raise_for_status()
-        logging.info(response.status_code)
-
-        if response.status_code != 304:
-            logging.info('Last Modified Expired: Refilling Cache')
-            last_modified = response.headers.get('Last-Modified')
-            max_age = response.headers.get('Cache-Control').split('=')[-1]
-            content = response.content
-            await store.set(_cache_key, content, ex=int(max_age))
-            await store.set(_last_modified_cache_key, last_modified)
-            return None
-        else:
-            return None
-    return None
+def drop_tables_sql():
+    with open(f'{ROOT}\\sql\\drop_tables.sql', 'w', encoding='utf-8') as f:
+        f.write(drop_table_names)
 
 
-async def get_json_world_component_content_paths(url_list: list[tuple[str, str]]):
-    async with AsyncClient(http2=True, base_url='https://www.bungie.net') as client:
-        tasks = [download_file_async(client, url[1], API_KEY, url[0]) for url in url_list]
-        await gather(*tasks)
+def copy_from_sql():
+    with open(f'{ROOT}\\sql\\copy_from_table.sql', 'w', encoding='utf-8') as f:
+        copy_from_query = '\n'.join([f"COPY {x} (id, json) FROM '{ROOT}\\csv\\{x}.csv' WITH (FORMAT csv,HEADER true,QUOTE \'\"\',ESCAPE \'\"\');" for x in keys_list])
+        f.write(copy_from_query)
 
+def copy_from():
+    with ConnectionPool(conninfo='host=localhost port=5432 dbname=world_content user=postgres password=postgres') as pool:
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                logging.info(f"Dropping tables")
+                cur.execute(drop_table_names)
 
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                logging.info(f"Creating tables")
+                cur.execute(create_table_names)
 
+        for table_name in keys_list:
+            logging.info(f"Creating {table_name}.csv")
+            json_blob = str(r.get(f"{table_name}:jwccp"))
+            json_dict = orjson.loads(json_blob.encode('utf-8'))
+            with open(f'{ROOT}\\csv\\{table_name}.csv', 'w', encoding='utf-8', newline='') as f:
+                writer = csv.writer(f, quoting=csv.QUOTE_MINIMAL)
+                for key, value in json_dict.items():
+                    writer.writerow([int(key), orjson.dumps(value).decode('utf-8')])
 
-async def deserialize() -> Manifest:
-    manifest_string = await get_manifest('https://www.bungie.net/Platform/Destiny2/Manifest', API_KEY, 'manifest')
-    return Manifest.model_validate(loads(manifest_string))
-
-
-async def to_json():
-    manifest_string = await get_manifest('https://www.bungie.net/Platform/Destiny2/Manifest', API_KEY, 'manifest')
-    return orjson_loads(manifest_string.encode('utf-8'))
-
-
-async def get_uris(result: Manifest) -> list[tuple[str, str]]:
-    return [x for x in result.Response.jsonWorldComponentContentPaths.en.model_dump().items()]
-
-
-async def main() -> None:
-    manifest = await deserialize()
-    uris = await get_uris(manifest)
-    await get_json_world_component_content_paths(uris)
+        with pool.connection() as conn:
+            with conn.cursor() as cur:
+                for table_name in keys_list:
+                    logging.info(f"COPY FROM {table_name}.csv")
+                    cur.execute(f"""
+                        COPY {table_name} (id, json)
+                        FROM '{ROOT}\\csv\\{table_name}.csv'
+                        WITH (
+                            FORMAT csv,
+                            HEADER true,
+                            QUOTE '"',
+                            ESCAPE '"'
+                        )
+                    """)
+            conn.commit()
 
 if __name__ == '__main__':
-    run(main())
+    create_tables_sql()
+    drop_tables_sql()
+    copy_from_sql()
+    copy_from()
