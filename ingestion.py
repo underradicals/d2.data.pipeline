@@ -70,10 +70,10 @@ async def get_uris(result: Manifest) -> list[tuple[str, str]]:
     return [x for x in result.Response.jsonWorldComponentContentPaths.en.model_dump().items()]
 
 
-async def main() -> None:
+async def ingestion_main() -> None:
     manifest = await deserialize()
     uris = await get_uris(manifest)
     await get_json_world_component_content_paths(uris)
 
 if __name__ == '__main__':
-    run(main())
+    pass
