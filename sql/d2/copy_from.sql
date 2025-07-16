@@ -1,0 +1,1 @@
+﻿copy StatType from 'D:\\Personal\\D2.Data.Pipeline\\data\\csv\\stat_types.csv' with (format csv, header, escape '"', quote '"');
