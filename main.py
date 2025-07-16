@@ -2,6 +2,9 @@
 from ingestion import ingestion_main
 from load import load_main
 
-if __name__ == "__main__":
-    run(ingestion_main())
+async def main():
+    await ingestion_main()
     load_main()
+
+if __name__ == "__main__":
+    run(main())

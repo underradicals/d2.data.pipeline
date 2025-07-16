@@ -1,3 +1,4 @@
+-- Takes data from the file at ROOT/csv/*.csv and inserts the data into the world_content database
 COPY DestinyActivitySkullSubcategoryDefinition (id, json) FROM 'D:\Personal\D2.Data.Pipeline\csv\DestinyActivitySkullSubcategoryDefinition.csv' WITH (FORMAT csv,HEADER true,QUOTE '"',ESCAPE '"');
 COPY DestinyFireteamFinderLabelDefinition (id, json) FROM 'D:\Personal\D2.Data.Pipeline\csv\DestinyFireteamFinderLabelDefinition.csv' WITH (FORMAT csv,HEADER true,QUOTE '"',ESCAPE '"');
 COPY DestinySandboxPatternDefinition (id, json) FROM 'D:\Personal\D2.Data.Pipeline\csv\DestinySandboxPatternDefinition.csv' WITH (FORMAT csv,HEADER true,QUOTE '"',ESCAPE '"');
