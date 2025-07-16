@@ -1,8 +1,5 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from dataclasses import dataclass
-
-@dataclass
 class DestinyDefinitions(BaseModel):
     DestinyArtDyeChannelDefinition: str
     DestinyArtDyeReferenceDefinition: str
@@ -21,7 +18,7 @@ class DestinyDefinitions(BaseModel):
     DestinyRewardSourceDefinition: str
     DestinyUnlockValueDefinition: str
     DestinyRewardMappingDefinition: str
-    DestinyRewardSheetDefinition: str
+    # DestinyRewardSheetDefinition: Field(exclude=True)
     DestinyItemCategoryDefinition: str
     DestinyDamageTypeDefinition: str
     DestinyActivityModeDefinition: str
@@ -91,3 +88,6 @@ class DestinyDefinitions(BaseModel):
     DestinyLoadoutConstantsDefinition: str
     DestinyFireteamFinderConstantsDefinition: str
     DestinyGlobalConstantsDefinition: str
+
+    class Config:
+        extra = "allow"

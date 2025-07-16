@@ -1,4 +1,5 @@
-﻿from os import environ
+﻿import json
+from os import environ
 from asyncio import run, gather
 from json import loads
 from httpx import AsyncClient
@@ -22,9 +23,8 @@ async def get_manifest(url: str, api_key: str, cache_key: str) -> str:
         print('Cache key not found')
         with get(url, stream=True, allow_redirects=True, headers={'x-api-key': api_key}) as response:
             response.raise_for_status()
-            max_age = response.headers.get('Cache-Control').split('=')[-1]
             content = response.content
-            await store.set(_cache_key, content, ex=int(max_age))
+            await store.set(_cache_key, content, ex=604800)
             return content.decode('utf-8')
 
     logging.info("Returning Cache Value")
@@ -34,38 +34,15 @@ async def get_manifest(url: str, api_key: str, cache_key: str) -> str:
 
 async def download_file_async(client: AsyncClient, url: str, api_key: str, cache_key: str):
     _cache_key = f'{cache_key}:jwccp'
-    _last_modified_cache_key = f'{cache_key}:last_modified'
-    last_modified_cache_value: str = await store.get(_last_modified_cache_key)
     cache_key_value: str | bytes | None = await store.get(_cache_key)
 
-    if last_modified_cache_value is None:
-        logging.info('First Time: Lets make a good impression')
+    if cache_key_value is None:
+        logging.info('Max Age Expired')
         response = await client.get(url, follow_redirects=True, headers={'x-api-key': api_key})
         response.raise_for_status()
-        last_modified = response.headers.get('Last-Modified')
-        max_age = response.headers.get('Cache-Control').split('=')[-1]
-        content = response.content
-        await store.set(_cache_key, content, ex=int(max_age))
-        await store.set(_last_modified_cache_key, last_modified)
-        return None
-
-    if cache_key_value is None:
-        logging.info('Max Age Expired: Falling back to last modified')
-        headers = {'x-api-key': api_key, 'If-None-Match': last_modified_cache_value}
-        response = await client.get(url, follow_redirects=True, headers=headers)
-        response.raise_for_status()
         logging.info(response.status_code)
-
-        if response.status_code != 304:
-            logging.info('Last Modified Expired: Refilling Cache')
-            last_modified = response.headers.get('Last-Modified')
-            max_age = response.headers.get('Cache-Control').split('=')[-1]
-            content = response.content
-            await store.set(_cache_key, content, ex=int(max_age))
-            await store.set(_last_modified_cache_key, last_modified)
-            return None
-        else:
-            return None
+        content = response.content
+        await store.set(_cache_key, content, ex=604800)
     return None
 
 
@@ -79,6 +56,8 @@ async def get_json_world_component_content_paths(url_list: list[tuple[str, str]]
 
 async def deserialize() -> Manifest:
     manifest_string = await get_manifest('https://www.bungie.net/Platform/Destiny2/Manifest', API_KEY, 'manifest')
+    with open('manifest.json', 'w') as manifest:
+        manifest.write(json.dumps(json.loads(manifest_string), indent=2))
     return Manifest.model_validate(loads(manifest_string))
 
 
