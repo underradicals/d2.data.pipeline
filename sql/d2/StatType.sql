@@ -1,4 +1,4 @@
-﻿drop table if exists StatType cascade;
+drop table if exists StatType cascade;
 
 create table StatType (
     id bigint primary key,
@@ -18,5 +18,5 @@ copy StatType from 'D:\\Personal\\D2.Data.Pipeline\\data\\csv\\stat_types.csv' w
 create materialized view if not exists  WeaponStatType as
 select id, hash, name, description from StatType where category = 1 and (name != '' or description != '');
 
-create index concurrently if not exists idx_weaponstattype_hash on WeaponStatType using btree (hash);
-create index concurrently if not exists idx_weaponstattype_name on WeaponStatType using btree (name);
+create index if not exists idx_weaponstattype_hash on WeaponStatType using btree (hash);
+create index if not exists idx_weaponstattype_name on WeaponStatType using btree (name);

@@ -1,1 +1,2 @@
-﻿copy StatType from 'D:\\Personal\\D2.Data.Pipeline\\data\\csv\\stat_types.csv' with (format csv, header, escape '"', quote '"');
+copy StatType from 'D:\\Personal\\D2.Data.Pipeline\\data\\csv\\stat_types.csv' with (format csv, header, escape '"', quote '"');
+copy ItemType from 'D:\\Personal\\D2.Data.Pipeline\\data\\csv\\item_types.csv' with (format csv, header, escape '"', quote '"');
