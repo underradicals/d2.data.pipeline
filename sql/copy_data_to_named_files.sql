@@ -15,13 +15,16 @@ copy (
     with (format csv, header, escape '"', quote '"');
 copy (
     select row_number() over (order by ItemType) as id,
+           DisplayName,
            ItemType,
-           SubType,
-           DisplayName
-    from (select distinct (json ->> 'itemType')::int             as ItemType,
-                          (json ->> 'itemSubType')::int          as SubType,
-                          (json ->> 'itemTypeDisplayName')::text as DisplayName
+           SubType
+    from (select distinct (json ->> 'itemTypeDisplayName')::text as DisplayName,
+                          (json ->> 'itemType')::int             as ItemType,
+                          (json ->> 'itemSubType')::int          as SubType
           from destinyinventoryitemdefinition
-          where (json ->> 'itemTypeDisplayName')::text != '') sub
+          where ((json ->> 'itemTypeDisplayName')::text is not null and (json ->> 'itemTypeDisplayName')::text != '')
+            and ((json ->> 'itemType')::int = 2 or (json ->> 'itemType')::int = 3 or (json ->> 'itemType')::int = 19)
+          order by ItemType
+) sub
     ) to 'D:\\Personal\\D2.Data.Pipeline\\data\\csv\\item_types.csv'
-    with (format csv, header, escape '"', quote '"');
+with (format csv, header, escape '"', quote '"');

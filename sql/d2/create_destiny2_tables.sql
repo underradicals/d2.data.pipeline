@@ -14,9 +14,9 @@ create index if not exists idx_stattype_category on StatType using btree (catego
 
 create table if not exists ItemType (
     id bigint primary key ,
+    displayName text,
     itemType bigint ,
-    subType text,
-    displayName text
+    subType text
 );
 
 

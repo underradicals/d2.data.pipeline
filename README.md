@@ -2,10 +2,11 @@
 
 ## Base Schemas
 - ClassType (Titan, Hunter, Warlock)
-- StatType
+- [x] ItemType (TB)
+- [x] StatType (TB)
 - DamageType
 - SocketType
-- WeaponType
+- [x] WeaponType (MV)
 - SlotType
 - EnergyType
 - AmmoType
